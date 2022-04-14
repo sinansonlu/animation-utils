@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+		</style>
+	</head>
+	<body>
+	
+	<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../js/three.module.js"
+				}
+			}
+		</script>
+
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { FBXLoader } from './jsm/loaders/FBXLoader.js';
+			import { BVHLoader } from './jsm/loaders/BVHLoader.js';
+			import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+			import { ColladaLoader } from './jsm/loaders/ColladaLoader.js';
+			import { OrbitControls } from './jsm/controls/OrbitControls.js';
+			import * as SkeletonUtils from './jsm/utils/SkeletonUtils.js';
+
+			let camera, scene, renderer;
+			let clock;
+
+			var mixer,mixer2;
+
+			init();
+			animate();
+			
+			var r_arm = [];
+			var l_arm = [];
+			var neck;
+			
+			var necks;
+			
+			var bvhSkeletonHelper, bvhMixer;
+			var bvhSkeletonHelper2, bvhMixer2;
+			var bvhSkeletonHelper3, bvhMixer3;
+			var controls;
+			
+			var hips;
+			var lowerBack;
+			var spine;
+			var spine1;
+			var leftShoulder;
+			var leftArm;
+			
+			function init() {
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000000 );
+				camera.position.set( 0, 6, 600 );
+				camera.lookAt( 0, 2, 0 );
+			
+				clock = new THREE.Clock();
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0xa0a0a0 );
+
+				const hemiLight = new THREE.HemisphereLight( 0xffffff, 0x444444 );
+				hemiLight.position.set( 0, 20, 0 );
+				scene.add( hemiLight );
+
+				const dirLight = new THREE.DirectionalLight( 0xffffff );
+				dirLight.position.set( - 3, 10, - 10 );
+				dirLight.castShadow = true;
+				dirLight.shadow.camera.top = 4;
+				dirLight.shadow.camera.bottom = - 4;
+				dirLight.shadow.camera.left = - 4;
+				dirLight.shadow.camera.right = 4;
+				dirLight.shadow.camera.near = 0.1;
+				dirLight.shadow.camera.far = 40;
+				scene.add( dirLight );
+
+				// ground
+				const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 200, 200 ), new THREE.MeshPhongMaterial( { color: 0x999999, depthWrite: false } ) );
+				mesh.rotation.x = - Math.PI / 2;
+				mesh.receiveShadow = true;
+				scene.add( mesh );
+
+				// const loader = new FBXLoader();
+				
+				var loader = new BVHLoader();
+				loader.load( "animations/video.bvh", function ( result ) {
+
+					bvhSkeletonHelper = new THREE.SkeletonHelper( result.skeleton.bones[ 0 ] );
+					bvhSkeletonHelper.skeleton = result.skeleton; // allow animation mixer to bind to SkeletonHelper directly
+
+					var boneContainer = new THREE.Group();
+					boneContainer.add( result.skeleton.bones[ 0 ] );
+					boneContainer.rotation.x = THREE.Math.degToRad(-90);
+					boneContainer.scale.set(0.1, 0.1, 0.1);
+
+					scene.add( bvhSkeletonHelper );
+					scene.add( boneContainer );
+					
+					
+					// play animation
+					bvhMixer = new THREE.AnimationMixer( bvhSkeletonHelper );
+					bvhMixer.clipAction( result.clip ).setEffectiveWeight( 1.0 ).play();
+				} );
+
+
+				function AddCubeWithPivot(x,y,z,px,py,pz,rx,ry,rz,parent) {
+				
+					const geometry = new THREE.BoxGeometry(x,y,z);
+					const material = new THREE.MeshPhysicalMaterial({
+						color: 0x00ff00
+					});
+
+					const cube = new THREE.Mesh(geometry, material);
+					cube.position.y = y/2;
+					
+					var pivot = new THREE.Group();
+					pivot.position.set(px,py,pz);
+					pivot.rotation.set(THREE.Math.degToRad(rx),THREE.Math.degToRad(ry),THREE.Math.degToRad(rz));
+					pivot.add( cube );
+					// pivot.rotation.x = THREE.Math.degToRad(45);
+					
+					if(parent) {
+						parent.add(pivot);
+					}
+					return pivot;
+					
+				
+				}
+				
+				// cube model
+				var h_hips = 10;
+				var h_lowerBack = 20;
+				var h_spine = 20;
+				var h_spine1 = 20;
+				
+				var h_leftShoulder = 10;
+				var h_leftArm = 60;
+				
+				hips = AddCubeWithPivot(10,h_hips,10, 0,0,0, 0,0,0,null);
+				lowerBack = AddCubeWithPivot(30,h_lowerBack,10, 0,h_hips,0, 0,0,0,hips);
+				spine = AddCubeWithPivot(30,h_spine,10, 0,h_lowerBack,0, 0,0,0,lowerBack);
+				spine1 = AddCubeWithPivot(30,h_spine1,10, 0,h_spine,0, 0,0,0,spine);
+				leftShoulder = AddCubeWithPivot(10,h_leftShoulder,10, 20,h_spine1-10,0, 0,0,0,spine1);
+				leftArm = AddCubeWithPivot(10,h_leftArm,10, 0,0,0, 0,0,0,leftShoulder);
+				
+				scene.add(hips);
+				hips.position.y = 0;
+					
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.outputEncoding = THREE.sRGBEncoding;
+				renderer.shadowMap.enabled = true;
+				document.body.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize );
+				
+				controls = new OrbitControls( camera, renderer.domElement );
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+			
+			let k = 0;
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				const delta = clock.getDelta();
+
+				if(mixer) mixer.update( delta );
+				//if(mixer2) mixer2.update( delta );
+
+				if(bvhMixer)
+				{
+					bvhMixer.update( delta );
+					//SkeletonUtils.retarget( bvhSkeletonHelper2, bvhSkeletonHelper); //, options );
+				}
+				
+				if(bvhMixer3){
+					bvhMixer3.update( delta );
+					//SkeletonUtils.retarget( bvhSkeletonHelper, bvhSkeletonHelper3 );
+				}
+				controls.update();
+				
+				if(r_arm) {
+					// r_arm.rotation.y += THREE.Math.degToRad(k);k++;
+					r_arm.forEach(myFunction);
+					
+					function myFunction(item, index, arr) {
+						//arr[index].rotation.x += THREE.Math.degToRad(270);k++;
+					}	
+				}
+				
+				if(l_arm) {
+					l_arm.forEach(myFunction);
+					
+					function myFunction(item, index, arr) {
+						//arr[index].rotation.x += THREE.Math.degToRad(270);k++;
+					}
+				}
+				
+				// console.log(bvhSkeletonHelper.skeleton.getBoneByName("LeftArm").rotation);
+				
+				if(bvhSkeletonHelper){
+					hips.rotation.x = bvhSkeletonHelper.skeleton.getBoneByName("Hips").rotation.x;
+					hips.rotation.y = bvhSkeletonHelper.skeleton.getBoneByName("Hips").rotation.y;
+					hips.rotation.z = bvhSkeletonHelper.skeleton.getBoneByName("Hips").rotation.z;
+					
+					lowerBack.rotation.x = bvhSkeletonHelper.skeleton.getBoneByName("LowerBack").rotation.x;
+					lowerBack.rotation.y = bvhSkeletonHelper.skeleton.getBoneByName("LowerBack").rotation.y;
+					lowerBack.rotation.z = bvhSkeletonHelper.skeleton.getBoneByName("LowerBack").rotation.z;
+					
+					spine.rotation.x = bvhSkeletonHelper.skeleton.getBoneByName("Spine").rotation.x;
+					spine.rotation.y = bvhSkeletonHelper.skeleton.getBoneByName("Spine").rotation.y;
+					spine.rotation.z = bvhSkeletonHelper.skeleton.getBoneByName("Spine").rotation.z;
+					
+					spine1.rotation.x = bvhSkeletonHelper.skeleton.getBoneByName("Spine1").rotation.x;
+					spine1.rotation.y = bvhSkeletonHelper.skeleton.getBoneByName("Spine1").rotation.y;
+					spine1.rotation.z = bvhSkeletonHelper.skeleton.getBoneByName("Spine1").rotation.z;
+					
+					leftShoulder.rotation.x = bvhSkeletonHelper.skeleton.getBoneByName("LeftShoulder").rotation.x;
+					leftShoulder.rotation.y = bvhSkeletonHelper.skeleton.getBoneByName("LeftShoulder").rotation.y;
+					leftShoulder.rotation.z = bvhSkeletonHelper.skeleton.getBoneByName("LeftShoulder").rotation.z;
+					
+					leftArm.rotation.x = bvhSkeletonHelper.skeleton.getBoneByName("LeftArm").rotation.x + THREE.Math.degToRad(90);
+					leftArm.rotation.y = bvhSkeletonHelper.skeleton.getBoneByName("LeftArm").rotation.y;
+					leftArm.rotation.z = bvhSkeletonHelper.skeleton.getBoneByName("LeftArm").rotation.z+ THREE.Math.degToRad(90);
+				}
+
+				renderer.render( scene, camera );
+			}
+		</script>
+	</body>
+</html>
+
+

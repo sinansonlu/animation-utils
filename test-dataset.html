@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+		</style>
+	</head>
+	<body>
+	
+	<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../js/three.module.js"
+				}
+			}
+		</script>
+
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { FBXLoader } from './jsm/loaders/FBXLoader.js';
+			import { BVHLoader } from './jsm/loaders/BVHLoader.js';
+			import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+			import { ColladaLoader } from './jsm/loaders/ColladaLoader.js';
+			import { OrbitControls } from './jsm/controls/OrbitControls.js';
+			import * as SkeletonUtils from './jsm/utils/SkeletonUtils.js';
+
+			let camera, scene, renderer;
+			let clock;
+
+			var mixer,mixer2;
+
+			init();
+			animate();
+			
+			var r_arm = [];
+			var l_arm = [];
+			var neck;
+			
+			var necks;
+			
+			var bvhSkeletonHelper, bvhMixer;
+			var bvhSkeletonHelper2, bvhMixer2;
+			var bvhSkeletonHelper3, bvhMixer3;
+			var bvhSkeletonHelperN, bvhMixerN;
+			var controls;
+			var dict = {};
+
+			function init() {
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000000 );
+				camera.position.set( 0, 6, 600 );
+				camera.lookAt( 0, 2, 0 );
+			
+				clock = new THREE.Clock();
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0xa0a0a0 );
+//				scene.fog = new THREE.Fog( 0xa0a0a0, 10, 50 );
+
+				const hemiLight = new THREE.HemisphereLight( 0xffffff, 0x444444 );
+				hemiLight.position.set( 0, 20, 0 );
+				scene.add( hemiLight );
+
+				const dirLight = new THREE.DirectionalLight( 0xffffff );
+				dirLight.position.set( - 3, 10, - 10 );
+				dirLight.castShadow = true;
+				dirLight.shadow.camera.top = 4;
+				dirLight.shadow.camera.bottom = - 4;
+				dirLight.shadow.camera.left = - 4;
+				dirLight.shadow.camera.right = 4;
+				dirLight.shadow.camera.near = 0.1;
+				dirLight.shadow.camera.far = 40;
+				scene.add( dirLight );
+
+				// scene.add( new THREE.CameraHelper( dirLight.shadow.camera ) );
+
+				// ground
+				const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 200, 200 ), new THREE.MeshPhongMaterial( { color: 0x999999, depthWrite: false } ) );
+				mesh.rotation.x = - Math.PI / 2;
+				mesh.receiveShadow = true;
+				scene.add( mesh );
+
+				const loader = new FBXLoader();
+				const loader2 = new GLTFLoader();
+				const loader_bvh = new BVHLoader();
+				const loader_dae = new ColladaLoader();
+				
+				var newmodel;
+								
+				loader.load( 'models/model-mixamo.fbx', function ( object ) {
+
+					mixer = new THREE.AnimationMixer( object.children[1] );
+					newmodel = object;
+					
+					bvhSkeletonHelperN = new THREE.SkeletonHelper( object.children[1].skeleton.bones[ 0 ] );
+					bvhSkeletonHelperN.skeleton = object.children[1].skeleton;
+
+					object.traverse( function ( child ) {
+
+						if ( child.isMesh ) {
+
+							child.castShadow = true;
+							child.receiveShadow = true;
+						}
+						
+						if (child.isBone) {
+							dict[child.name] = child;
+						}
+					});
+
+					scene.add( object );
+					
+					loader_bvh.load( "animations/angry_01_000.bvh", function ( result ) {
+
+						bvhSkeletonHelper = new THREE.SkeletonHelper( result.skeleton.bones[ 0 ] );
+						bvhSkeletonHelper.skeleton = result.skeleton; 
+						
+						result.clip.tracks.forEach(myFunction2);
+
+						function myFunction2(item, index, arr) {
+							
+							if(arr[index]["name"].split('.')[2] == 'position'){
+								delete arr[index];
+								arr.splice(index, 1);;
+							}
+							
+							if(arr[index]["name"].split('.')[1] == 'bones[LHipJoint]'){
+								delete arr[index];
+								arr.splice(index, 1);;
+							}
+							
+							if(arr[index]["name"].split('.')[1] == 'bones[RHipJoint]'){
+								delete arr[index];
+								arr.splice(index, 1);;
+							}
+						}
+						
+						const cc = SkeletonUtils.retargetClip ( bvhSkeletonHelperN, bvhSkeletonHelper, result.clip)
+						const action = mixer.clipAction( cc );
+						action.play();
+					});
+					
+					
+				} );
+	
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.outputEncoding = THREE.sRGBEncoding;
+				renderer.shadowMap.enabled = true;
+				document.body.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize );
+				
+				controls = new OrbitControls( camera, renderer.domElement );
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+			
+			let k = 0;
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				const delta = clock.getDelta();
+
+				if(mixer) mixer.update( delta );
+				//if(mixer2) mixer2.update( delta );
+
+				if(bvhMixer)
+				{
+					bvhMixer.update( delta );
+					SkeletonUtils.retarget( bvhSkeletonHelper2, bvhSkeletonHelper); //, options );
+				}
+				
+				if(bvhMixer3){
+					bvhMixer3.update( delta );
+					//SkeletonUtils.retarget( bvhSkeletonHelper, bvhSkeletonHelper3 );
+				}
+				controls.update();
+				
+				if(r_arm) {
+					// r_arm.rotation.y += THREE.Math.degToRad(k);k++;
+					r_arm.forEach(myFunction);
+					
+					function myFunction(item, index, arr) {
+						//arr[index].rotation.x += THREE.Math.degToRad(270);k++;
+					}	
+				}
+				
+				if(false) {
+					dict["Hips"].rotation.x += THREE.Math.degToRad(90);
+					dict["LHipJoint"].rotation.z += THREE.Math.degToRad(180);
+					dict["LHipJoint"].rotation.y += THREE.Math.degToRad(90);
+					//dict["RHipJoint"].rotation.x += THREE.Math.degToRad(180);
+					//dict["LeftShoulder"].rotation.z += THREE.Math.degToRad(270);
+					//dict["RightShoulder"].rotation.z += THREE.Math.degToRad(90);
+					k++;
+				}
+				
+				if(false){
+				dict["Hips"].rotation.x += THREE.Math.degToRad(90);
+					dict["LHipJoint"].rotation.x += THREE.Math.degToRad(180);
+					dict["RHipJoint"].rotation.x += THREE.Math.degToRad(180);
+					dict["LeftShoulder"].rotation.z += THREE.Math.degToRad(270);
+					dict["RightShoulder"].rotation.z += THREE.Math.degToRad(90);}
+					
+				renderer.render( scene, camera );
+			}
+		</script>
+	</body>
+</html>
+
+

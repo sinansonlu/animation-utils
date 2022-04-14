@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+		</style>
+	</head>
+	<body>
+	
+		<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+		
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../js/three.module.js"
+				}
+			}
+		</script>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { FBXLoader } from './jsm/loaders/FBXLoader.js';
+			import { BVHLoader } from './jsm/loaders/BVHLoader.js';
+			import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+			import { ColladaLoader } from './jsm/loaders/ColladaLoader.js';
+			import { OrbitControls } from './jsm/controls/OrbitControls.js';
+			import * as SkeletonUtils from './jsm/utils/SkeletonUtils.js';
+
+			let camera, scene, renderer;
+			let clock;
+
+			var mixer,mixer2;
+
+			init();
+			animate();
+			
+			var r_arm = [];
+			var l_arm = [];
+			var neck;
+			
+			var necks;
+			
+			var bvhSkeletonHelper, bvhMixer;
+			var bvhSkeletonHelper2, bvhMixer2;
+			var bvhSkeletonHelper3, bvhMixer3;
+			var controls;
+			
+			var options = {
+					hip: "Hips",
+					names: {
+						"mixamorigHips": "Hips",
+						//"mixamorigLeftHipJoint": "LeftHipJoint",
+						"mixamorigLeftHipJoint": "LHipJoint",
+						"mixamorigLeftUpLeg": "LeftHip",
+						"mixamorigLeftLeg": "LeftKnee",
+
+						"mixamorigLeftFoot": "LeftAnkle",
+						"mixamorigLowerBack": "LowerBack",
+						"mixamorigSpine": "Spine", // *
+
+						"mixamorigSpine2": "Spine1",
+						//"mixamorigLeftShoulder": "LeftShoulder",
+						"mixamorigLeftArm": "LeftShoulder",
+
+						"mixamorigLeftForeArm": "LeftElbow",
+						"mixamorigLeftHand": "LeftWrist",
+						"mixamorigNeck": "Neck", // *
+
+						"mixamorigNeck1": "Neck1",
+						
+						//"mixamorigRightShoulder": "RightShoulder",
+						"mixamorigRightArm": "RightShoulder",
+						"mixamorigRightForeArm": "RightElbow",
+						"mixamorigRightHand": "RightWrist",
+						//"mixamorigRightHipJoint": "RightHipJoint",
+						"mixamorigRightHipJoint": "RHipJoint",
+						"mixamorigRightUpLeg": "RightHip",
+						"mixamorigRightLeg": "RightKnee",
+						"mixamorigRightFoot": "RightAnkle",
+						"mixamorigChest": "Thorax",
+						"mixamorigHead": "Head"
+					}
+				};
+
+
+			function init() {
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000000 );
+				camera.position.set( 0, 6, 600 );
+				camera.lookAt( 0, 2, 0 );
+			
+				clock = new THREE.Clock();
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0xa0a0a0 );
+//				scene.fog = new THREE.Fog( 0xa0a0a0, 10, 50 );
+
+				const hemiLight = new THREE.HemisphereLight( 0xffffff, 0x444444 );
+				hemiLight.position.set( 0, 20, 0 );
+				scene.add( hemiLight );
+
+				const dirLight = new THREE.DirectionalLight( 0xffffff );
+				dirLight.position.set( - 3, 10, - 10 );
+				dirLight.castShadow = true;
+				dirLight.shadow.camera.top = 4;
+				dirLight.shadow.camera.bottom = - 4;
+				dirLight.shadow.camera.left = - 4;
+				dirLight.shadow.camera.right = 4;
+				dirLight.shadow.camera.near = 0.1;
+				dirLight.shadow.camera.far = 40;
+				scene.add( dirLight );
+
+				// scene.add( new THREE.CameraHelper( dirLight.shadow.camera ) );
+
+				// ground
+
+				const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 200, 200 ), new THREE.MeshPhongMaterial( { color: 0x999999, depthWrite: false } ) );
+				mesh.rotation.x = - Math.PI / 2;
+				mesh.receiveShadow = true;
+				scene.add( mesh );
+
+				const loader = new FBXLoader();
+				const loader2 = new GLTFLoader();
+				const loader_bvh = new BVHLoader();
+				const loader_dae = new ColladaLoader();
+				
+				loader.load( 'ne4.fbx', function ( object ) {
+				
+					object.traverse( function ( child ) {
+
+						if ( child.isMesh ) {
+							child.castShadow = true;
+							child.receiveShadow = true;
+						}
+
+
+					} );
+					//object.scale.multiplyScalar(0.002);
+					bvhSkeletonHelper2 = new THREE.SkeletonHelper( object );
+					console.log(object);
+					
+					bvhSkeletonHelper2.skeleton = new THREE.Skeleton(bvhSkeletonHelper2.bones);
+					bvhSkeletonHelper2.visible = true;
+					
+					scene.add( bvhSkeletonHelper2 );
+					scene.add( object );
+					
+					function loadBVH() {
+
+						var loader = new BVHLoader();
+						loader.load( "animations/video.bvh", function ( result ) {
+
+							bvhSkeletonHelper = new THREE.SkeletonHelper( result.skeleton.bones[ 0 ] );
+							bvhSkeletonHelper.skeleton = result.skeleton; // allow animation mixer to bind to SkeletonHelper directly
+
+							var boneContainer = new THREE.Group();
+							boneContainer.add( result.skeleton.bones[ 0 ] );
+							boneContainer.position.z = - 100;
+							boneContainer.position.y = - 100;
+
+							scene.add( bvhSkeletonHelper );
+							scene.add( boneContainer );
+
+							// get offsets when it is in T-Pose
+							console.log(bvhSkeletonHelper);
+							console.log(bvhSkeletonHelper2);
+							console.log(options);
+							console.log(SkeletonUtils);
+							
+							// options.offsets = SkeletonUtils.getSkeletonOffsets( bvhSkeletonHelper2, bvhSkeletonHelper, options );
+
+							// play animation
+							bvhMixer = new THREE.AnimationMixer( bvhSkeletonHelper );
+							bvhMixer.clipAction( result.clip ).setEffectiveWeight( 1.0 ).play();
+							
+
+						} );
+
+					}
+					
+					loadBVH();
+				});
+					
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.outputEncoding = THREE.sRGBEncoding;
+				renderer.shadowMap.enabled = true;
+				document.body.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize );
+				
+				controls = new OrbitControls( camera, renderer.domElement );
+
+
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+			
+			let k = 0;
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				const delta = clock.getDelta();
+
+				if(mixer) mixer.update( delta );
+				//if(mixer2) mixer2.update( delta );
+
+				if(bvhMixer)
+				{
+					bvhMixer.update( delta );
+					SkeletonUtils.retarget( bvhSkeletonHelper2, bvhSkeletonHelper); //, options );
+				}
+				
+				if(bvhMixer3){
+					bvhMixer3.update( delta );
+					//SkeletonUtils.retarget( bvhSkeletonHelper, bvhSkeletonHelper3 );
+				}
+				controls.update();
+				
+				if(r_arm) {
+					// r_arm.rotation.y += THREE.Math.degToRad(k);k++;
+					r_arm.forEach(myFunction);
+					
+					function myFunction(item, index, arr) {
+						//arr[index].rotation.x += THREE.Math.degToRad(270);k++;
+					}	
+				}
+				
+				if(l_arm) {
+					l_arm.forEach(myFunction);
+					
+					function myFunction(item, index, arr) {
+						//arr[index].rotation.x += THREE.Math.degToRad(270);k++;
+					}
+				}
+					
+				renderer.render( scene, camera );
+			}
+		</script>
+	</body>
+</html>
+
+
