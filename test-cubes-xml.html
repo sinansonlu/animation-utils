@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+		</style>
+	</head>
+	<body>
+	
+	<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../js/three.module.js",
+					"dat": "../js/dat.gui.module.js"
+				}
+			}
+		</script>
+
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { GUI } from 'dat'
+			import { FBXLoader } from './jsm/loaders/FBXLoader.js';
+			import { BVHLoader } from './jsm/loaders/BVHLoader.js';
+			import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+			import { ColladaLoader } from './jsm/loaders/ColladaLoader.js';
+			import { OrbitControls } from './jsm/controls/OrbitControls.js';
+			import * as SkeletonUtils from './jsm/utils/SkeletonUtils.js';
+
+			let camera, scene, renderer;
+			let clock;
+
+			var mixer,mixer2;
+
+			var r_arm = [];
+			var l_arm = [];
+			var neck;
+			
+			var necks;
+			
+			var bvhSkeletonHelper, bvhMixer;
+			var bvhSkeletonHelper2, bvhMixer2;
+			var bvhSkeletonHelper3, bvhMixer3;
+			var controls;
+			
+			var hips;
+			var lowerBack;
+			var spine;
+			var spine1;
+			var leftShoulder;
+			var leftArm;
+			
+			var xmlDoc;
+			var frms;
+			var frms_i = 0;
+			var frms_ready = false;
+			
+			var person_0 = [];
+			var person_1 = [];
+			
+			var gui;
+			var animation_time = 0;
+			var animation_time_factor = {f: 1};
+			
+			init();
+			animate();
+			
+			// XML Read
+			function readFromXML_ShakeFive2(fileName){
+				var xhr = new XMLHttpRequest();
+				// './Animations/Video-17112014-013329.xml',
+				xhr.open('GET', './Animations/' + fileName, true);
+
+				xhr.timeout = 2000; // time in milliseconds
+
+				xhr.onload = function () {
+					xmlDoc = this.responseXML;
+					
+					var frames = xmlDoc.documentElement.getElementsByTagName('frames')[0].children;
+					frms = [];
+					
+					for (var i = 0; i  < frames.length; i++) {
+						if(frames[i].getElementsByTagName('skeletons_amount')[0].textContent != "0") {
+							// console.log(frames[i].getElementsByTagName('skeletons_amount')[0].textContent);
+							
+							var skeletons = frames[i].getElementsByTagName('skeletons')[0].children;
+							var sklts = [];
+							
+							for (var j = 0; j  < skeletons.length; j++) {
+								// get joint locations from this skeleton
+								var ps = skeletons[j].getElementsByTagName('point3Dd');
+								
+								var joints = skeletons[j].children[5].children;
+								
+								var arr = Array(75);
+								
+								for (var k = 0; k  < joints.length; k++) {
+									var id = Number(joints[k].children[0].textContent);
+									
+									var text = joints[k].children[3].textContent;
+									const myArray = text.trim().split(" ");
+									let x = Number(myArray[0]);
+									let y = Number(myArray[1]);
+									let z = Number(myArray[myArray.length-1]);
+									
+									arr[id*3] = x;
+									arr[id*3+1] = y;
+									arr[id*3+2] = z;
+								}
+														
+								sklts.push(arr);
+								
+								// console.log(arr);
+		
+								// console.log(joints.children[0]);
+								
+								//console.log(arr);
+								
+								var joint_0 = skeletons[j].getElementsByTagName('joint_0');
+								if(joint_0[0]) {
+									var text = joint_0[0].getElementsByTagName('point3Dd')[0].textContent;
+									const myArray = text.trim().split(" ");
+									let x = Number(myArray[0]);
+									let y = Number(myArray[1]);
+									let z = Number(myArray[myArray.length-1]);
+									//console.log(x + " " + y + " " + z);
+								}
+								
+							}
+							frms.push(sklts);
+						}
+					}
+					
+					console.log(frms);
+					frms_ready = true;
+				};
+
+				xhr.ontimeout = function (e) {
+				  // XMLHttpRequest timed out. Do something here.
+				  console.log(e);
+				};
+
+				xhr.send(null);
+				
+			}
+			
+			readFromXML_ShakeFive2('Video-17112014-013329.xml');
+			
+			function init() {
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000000 );
+				camera.position.set( 0, 6, 600 );
+				camera.lookAt( 0, 2, 0 );
+			
+				clock = new THREE.Clock();
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0xa0a0a0 );
+
+				const hemiLight = new THREE.HemisphereLight( 0xffffff, 0x444444 );
+				hemiLight.position.set( 0, 20, 0 );
+				scene.add( hemiLight );
+
+				const dirLight = new THREE.DirectionalLight( 0xffffff );
+				dirLight.position.set( - 3, 10, - 10 );
+				dirLight.castShadow = true;
+				dirLight.shadow.camera.top = 4;
+				dirLight.shadow.camera.bottom = - 4;
+				dirLight.shadow.camera.left = - 4;
+				dirLight.shadow.camera.right = 4;
+				dirLight.shadow.camera.near = 0.1;
+				dirLight.shadow.camera.far = 40;
+				scene.add( dirLight );
+
+				// ground
+				const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 200, 200 ), new THREE.MeshPhongMaterial( { color: 0x999999, depthWrite: false } ) );
+				mesh.rotation.x = - Math.PI / 2;
+				mesh.receiveShadow = true;
+				scene.add( mesh );
+
+				function AddCube(x,y,z,c) {
+				
+					const geometry = new THREE.BoxGeometry(x,y,z);
+					const material = new THREE.MeshPhysicalMaterial({
+						color: c
+					});
+
+					const cube = new THREE.Mesh(geometry, material);
+
+					return cube;
+				}
+				
+				for(var i = 0; i < 22; i++) {
+					person_0.push(AddCube(10,10,10,0x00ff00));
+					scene.add(person_0[i]);
+				}
+				
+				for(var i = 0; i < 22; i++) {
+					person_1.push(AddCube(10,10,10,0xff0000));
+					scene.add(person_1[i]);
+				}
+									
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.outputEncoding = THREE.sRGBEncoding;
+				renderer.shadowMap.enabled = true;
+				document.body.appendChild( renderer.domElement );
+
+				window.addEventListener( 'resize', onWindowResize );
+				
+				controls = new OrbitControls( camera, renderer.domElement );
+				
+				// GUI		
+				function changeDropDown(target){
+					console.log("Loading " + target);
+					readFromXML_ShakeFive2(target);
+					animation_time = 0;
+				}
+				
+				gui = new GUI();
+				const cubeFolder = gui.addFolder('Animation');
+				var text = {file: 'filePath'};
+				gui.add(text, 'file', 
+					{ 
+						1: 'Video-17112014-013329.xml', 
+						2: 'Video-17112014-013408.xml',
+						3: 'Video-17112014-013440.xml',
+						4: 'Video-17112014-013505.xml',
+						5: 'Video-17112014-013545.xml',
+						6: 'Video-17112014-013635.xml',
+						7: 'Video-17112014-013715.xml',
+						8: 'Video-17112014-013750.xml',
+						9: 'Video-17112014-013834.xml',
+						10: 'Video-17112014-014905.xml'
+					}).onChange(changeDropDown);
+
+				cubeFolder.add(animation_time_factor, 'f', 0, 1);
+				
+				cubeFolder.open();
+				const cameraFolder = gui.addFolder('Camera')
+				//cameraFolder.add(camera.position, 'z', 0, 10)
+				cameraFolder.open()
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+			
+			var scaleFactor = 120;
+			
+			function positionCube(c,index,i,j) {
+				var p_i = new THREE.Vector3( 
+					frms[frms_i][c][i*3] * scaleFactor,
+					frms[frms_i][c][i*3+1] * scaleFactor,
+					frms[frms_i][c][i*3+2] * scaleFactor);
+				
+				var p_j = new THREE.Vector3( frms[frms_i][c][j*3] * scaleFactor,
+					frms[frms_i][c][j*3+1] * scaleFactor,
+					frms[frms_i][c][j*3+2] * scaleFactor );
+				
+				if(c==0) {
+					person_0[index].position.lerpVectors(p_i, p_j, 0.5);
+					person_0[index].lookAt(p_j);
+					person_0[index].scale.z = p_i.distanceTo(p_j) / 10;
+				}
+				else if(c==1) {
+					person_1[index].position.lerpVectors(p_i, p_j, 0.5);
+					person_1[index].lookAt(p_j);
+					person_1[index].scale.z = p_i.distanceTo(p_j) / 10;
+				}
+			}
+			
+			function drawSkeleton(c) {
+				// person_0 cubes:
+				positionCube(c,0,0,1);
+				positionCube(c,1,1,20);
+				positionCube(c,2,20,2);
+				positionCube(c,3,2,3);
+				
+				// l_shoulder
+				positionCube(c,4,20,4);
+				positionCube(c,5,4,5);
+				positionCube(c,6,5,6);
+				positionCube(c,7,6,7);
+				positionCube(c,8,7,21);
+				
+				// r_shoulder
+				positionCube(c,9,20,8);
+				positionCube(c,10,8,9);
+				positionCube(c,11,9,10);
+				positionCube(c,12,10,11);
+				positionCube(c,13,11,23);
+				
+				// l_leg
+				positionCube(c,14,0,12);
+				positionCube(c,15,12,13);
+				positionCube(c,16,13,14);
+				positionCube(c,17,14,15);
+				
+				// r_leg
+				positionCube(c,18,0,16);
+				positionCube(c,19,16,17);
+				positionCube(c,20,17,18);
+				positionCube(c,21,18,19);
+			}
+			
+			function animate() {
+			
+				requestAnimationFrame( animate );
+
+				const delta = clock.getDelta();
+				animation_time = animation_time + delta * animation_time_factor.f;
+
+				controls.update();
+					
+				if(frms_ready){
+					drawSkeleton(0);
+					
+					if(frms[frms_i].length > 1) {
+						drawSkeleton(1);
+					}
+					
+					frms_i = Math.floor(animation_time * 30 % frms.length);
+				}
+
+				renderer.render( scene, camera );
+			}
+		</script>
+	</body>
+</html>
+
+
