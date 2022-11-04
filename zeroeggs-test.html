@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Animation Viewer</title>
+		<style>
+			.slidecontainer {
+			  width: 100%;
+			}
+			
+			.slider {
+			  -webkit-appearance: none;
+			  width: 100%;
+			  height: 20px;
+			  
+			  outline: none;
+			  opacity: 0.7;
+			  -webkit-transition: .2s;
+			  transition: opacity .2s;
+			}
+			
+			.slider:hover {
+			  opacity: 1;
+			}
+			
+			.slider::-webkit-slider-thumb {
+			  -webkit-appearance: none;
+			  appearance: none;
+			  width: 20px;
+			  height: 20px;
+			  background: #000000;
+			  cursor: pointer;
+			}
+			
+			.slider::-moz-range-thumb {
+			  width: 20px;
+			  height: 20px;
+			  background: #000000;
+			  cursor: pointer;
+			}
+			</style>
+	</head>
+	<body>
+		<div style="position: absolute; left: 1em; bottom: 1em; background: rgba(45, 45, 46, 0.623); padding: 0.5em; width: 96%;">
+			<input type="text" id="myText" value="0" size="7" readonly="readonly">
+			
+			<button type="button" id="myButton1" style="color:rgb(0, 168, 28);">Set Start (Q)</button>
+			<button type="button" id="myButton2" style="color:rgb(170, 0, 0);">Set End (E)</button>
+			<button type="button" id="myButton3" style="color:rgb(24, 0, 129);">Add Gap (W)</button>
+			<button type="button" id="myButton4">Play/Pause (Space)</button>
+			<button type="button" id="myButton5">Left</button>
+			<button type="button" id="myButton6">Right</button>
+			<button type="button" id="myButton7">Play Reverse/Pause</button>
+
+			Start: 
+			<input type="text" id="myStart" value="0" size="7" readonly="readonly">
+			End: 
+			<input type="text" id="myEnd" value="0" size="7" readonly="readonly">
+			<button type="button" id="myButton8" style="color:rgb(24, 0, 129);">Play/Pause Gap (R)</button>
+			<button type="button" id="myButton9" style="color:rgb(206, 20, 181);">Save File</button>
+			<button type="button" id="myButtonPrev">Prev</button>
+			<button type="button" id="myButtonNext">Next</button>
+
+			<p></p><input type="range" min="0" max="50" value="0" class="slider" id="myRange" step="0.0001">
+		</div>
+
+		<div id="myDiv" style="position: absolute; left: 1em; bottom: -1.4em; background: rgba(45, 45, 46, 0.623); padding: 0.5em; width: 96%; overflow: auto; height: 20px;">
+		</div>
+
+
+	<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../js/three.module.js"
+				}
+			}
+		</script>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { FBXLoader } from './jsm/loaders/FBXLoader.js';
+			import { BVHLoader } from './jsm/loaders/BVHLoader.js';
+			import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+			import { ColladaLoader } from './jsm/loaders/ColladaLoader.js';
+			import { OrbitControls } from './jsm/controls/OrbitControls.js';
+			import * as SkeletonUtils from './jsm/utils/SkeletonUtils.js';
+
+			const clock = new THREE.Clock();
+
+			var file_current = 0;
+			var file_list = [
+				"001_Neutral_0_mirror_x_1_0",
+				//"001_Neutral_0_x_1_0",
+				"003_Neutral_2_mirror_x_1_0",
+				"004_Neutral_3_mirror_x_1_0",
+				"004_Neutral_3_mirror_x_1_0"
+			];
+
+			let camera, controls, scene, renderer;
+			let mixer, skeletonHelper;
+
+			init();
+			animate();
+
+			var current_animation_clip;
+
+			var ani_list = [];
+			var ani_curr = 0;
+			var mode = 1;
+
+			var ani_start = 0;
+			var ani_end = 0;
+			var ani_play = 0;
+
+			var ani_time = 0;
+			var tmp_time = 0;
+
+			var isReverse = 0;
+			var ani_max = 0;
+
+			var gap_count = 0;
+			var bvhNameForSave = "";
+
+			var hsv_increment = 60;
+
+			var obj1;
+			var obj2;
+
+			function loadTXT(textName) {
+				var client = new XMLHttpRequest();
+				client.open('GET', textName);
+				
+				client.onreadystatechange = function() {
+					if(this.readyState == 4) { // readyState 4 means completed
+						
+						if(this.status == 404) {
+							console.log("No segments file found for this animation.");
+						}
+						else
+						{
+							var rsp = client.responseText;
+
+							var arr = rsp.split("\n");
+
+							var back_str =  "linear-gradient(to right,";
+	
+							var last_end = 0;
+							var color_hue = 0;
+
+							for (var i = 0; i < arr.length; i++)
+							{
+								var arr2 = arr[i].split(",");
+
+								if(arr2.length == 2) 
+								{
+									var st = parseFloat(arr2[0]);
+									var en = parseFloat(arr2[1]);
+									ani_list.push([st,en]);
+
+									var mark_start = (st/ani_max)*100;
+									var mark_end = (en/ani_max)*100;
+									
+									// also add button for it
+									let btn = document.createElement("button");
+									btn.innerHTML = gap_count;
+
+									color_hue = (hsv_increment * i) % 360;
+
+									// mark on slider
+									back_str += "gray " + last_end + "% " + mark_start + "%,"
+									back_str += 'hsl('+color_hue+',100%,50%)'+ " " + mark_start + "% " + mark_end + "%,"
+
+									last_end = mark_end;
+
+									btn.onclick = function() {
+										var index = parseInt(this.innerHTML);
+										ani_start = ani_list[index][0];
+										ani_end = ani_list[index][1];
+
+										document.getElementById("myStart").value = ani_start;
+										document.getElementById("myEnd").value = ani_end;
+
+										// also start playing the gap
+										ani_time = ani_start;
+										mode = 0;
+
+										document.getElementById("myButton1").disabled = true;
+										document.getElementById("myButton2").disabled = true;
+										document.getElementById("myButton3").disabled = true;
+										document.getElementById("myButton4").disabled = true;
+										document.getElementById("myButton5").disabled = true;
+										document.getElementById("myButton6").disabled = true;
+										document.getElementById("myButton7").disabled = true;
+									}
+
+									btn.style.backgroundColor = 'hsl('+color_hue+',30%,50%)';
+
+									document.getElementById("myDiv").appendChild(btn);
+
+									gap_count += 1;
+								}
+							}
+
+							back_str += "gray " + last_end + "% 100%)";
+							document.getElementById("myRange").style.background = back_str;
+						}
+					}
+				}
+				client.send();
+			}
+
+			const loader = new BVHLoader();
+
+			loadBVH(file_list[2]);
+
+			function loadBVH(bvhName) {
+				
+				if(obj1 !== null)
+					scene.remove(obj1); 
+				if(obj2 !== null)
+					scene.remove(obj2); 
+
+				bvhNameForSave = bvhName;
+				loader.load("animations/" + bvhName + ".bvh", function ( result ) {
+					skeletonHelper = new THREE.SkeletonHelper( result.skeleton.bones[ 0 ] );
+					skeletonHelper.skeleton = result.skeleton; // allow animation mixer to bind to THREE.SkeletonHelper directly
+
+					const boneContainer = new THREE.Group();
+
+					// to get the skeleton to the center
+					boneContainer.position.set(340,-100,550);
+
+					boneContainer.add( result.skeleton.bones[ 0 ] );
+					
+					obj1 = skeletonHelper;
+					obj2 = boneContainer;
+
+					scene.add( skeletonHelper );
+					scene.add( boneContainer );
+
+					current_animation_clip = result.clip;
+
+					// play animation
+					mixer = new THREE.AnimationMixer( skeletonHelper );
+					mixer.clipAction( result.clip ).setEffectiveWeight( 1.0 ).play();
+
+					analyzeAnim();
+
+					ani_max = mixer._actions[0]._clip.duration;
+					document.getElementById("myRange").max = ani_max;
+
+					//console.log(mixer._actions[0]._clip.duration);
+
+					loadTXT("animations/" + bvhName + ".txt");
+				});
+			}
+			
+			function init() {
+
+				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 100000 );
+				camera.position.set( 0, 100, 250 );
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0xffffff );
+
+				scene.add( new THREE.GridHelper( 300, 10 ) );
+
+				// renderer
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				document.body.appendChild( renderer.domElement );
+
+				controls = new OrbitControls( camera, renderer.domElement );
+				controls.minDistance = 200;
+				controls.maxDistance = 600;
+				controls.target.set(0,70,0);
+				controls.update();
+
+				window.addEventListener( 'resize', onWindowResize );
+			}
+
+			function onWindowResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+
+			function animate() {
+				requestAnimationFrame( animate );
+
+				const delta = clock.getDelta();
+				
+				if ( mixer ) {
+					if (mode == 0) {
+						ani_time += delta;
+
+						if(ani_time > ani_end) {
+							ani_time = ani_start;
+						} else if(ani_time < ani_start) {
+							ani_time = ani_start;
+						}
+
+						document.getElementById("myText").value = ani_time.toFixed(4);
+						document.getElementById("myRange").value = ani_time;
+						mixer.setTime(ani_time);
+					}
+					else if (mode == 1) {
+						if(ani_play == 1) {
+							if(isReverse == 0) {
+								ani_time += delta;
+							}
+							else{
+								ani_time -= delta;
+							}
+
+							if(ani_time <= 0) {
+								ani_time = ani_max;
+							} else if(ani_time >= ani_max) {
+								ani_time = 0;
+							}
+							
+							document.getElementById("myRange").value = ani_time;
+						}
+						else{
+							ani_time = parseFloat(document.getElementById("myRange").value);
+						}
+
+						document.getElementById("myText").value = ani_time.toFixed(4);
+						mixer.setTime(ani_time);
+					}
+					// mixer.update( delta );
+				}
+				renderer.render( scene, camera );
+			}
+			
+			document.addEventListener("keydown", keyDownTextField, false);
+
+			document.getElementById("myButton1").onclick = function() {  
+				ani_start = ani_time;
+				document.getElementById("myStart").value = ani_start;
+			};
+
+			document.getElementById("myButton2").onclick = function() {  
+				ani_end = ani_time;
+				document.getElementById("myEnd").value = ani_end;
+			};
+
+			document.getElementById("myButton3").onclick = function() {
+				// add current gap to the list
+				let btn = document.createElement("button");
+				btn.innerHTML = gap_count;
+				
+				btn.onclick = function() {
+					var index = parseInt(this.innerHTML);
+					ani_start = ani_list[index][0];
+					ani_end = ani_list[index][1];
+
+					document.getElementById("myStart").value = ani_start;
+					document.getElementById("myEnd").value = ani_end;
+
+					// also start playing the gap
+					ani_time = ani_start;
+					mode = 0;
+
+					document.getElementById("myButton1").disabled = true;
+					document.getElementById("myButton2").disabled = true;
+					document.getElementById("myButton3").disabled = true;
+					document.getElementById("myButton4").disabled = true;
+					document.getElementById("myButton5").disabled = true;
+					document.getElementById("myButton6").disabled = true;
+					document.getElementById("myButton7").disabled = true;
+				}
+
+				var hue = (hsv_increment * gap_count) % 360;
+				btn.style.backgroundColor = 'hsl('+hue+',30%,50%)';
+
+				document.getElementById("myDiv").appendChild(btn);
+
+				ani_list.push([ani_start, ani_end]);
+
+				gap_count += 1;
+
+				colorSlider();
+			};
+
+			document.getElementById("myButton4").onclick = function() {  
+				ani_play = (ani_play + 1) % 2;
+				isReverse = 0;
+			};
+
+			document.getElementById("myButton5").onclick = function() {  
+				ani_time -= 0.01;
+				document.getElementById("myRange").value = ani_time;
+			};
+
+			document.getElementById("myButton6").onclick = function() {  
+				ani_time += 0.01;
+				document.getElementById("myRange").value = ani_time;
+			};
+
+			document.getElementById("myButton7").onclick = function() {  
+				ani_play = (ani_play + 1) % 2;
+				isReverse = 1;
+			};
+
+			document.getElementById("myButton8").onclick = function() {
+				ani_time = ani_start;
+				mode = (mode + 1) % 2;
+
+				if (mode==0) {
+					document.getElementById("myButton1").disabled = true;
+					document.getElementById("myButton2").disabled = true;
+					document.getElementById("myButton3").disabled = true;
+					document.getElementById("myButton4").disabled = true;
+					document.getElementById("myButton5").disabled = true;
+					document.getElementById("myButton6").disabled = true;
+					document.getElementById("myButton7").disabled = true;
+				}
+				else if (mode==1) {
+					document.getElementById("myButton1").disabled = false;
+					document.getElementById("myButton2").disabled = false;
+					document.getElementById("myButton3").disabled = false;
+					document.getElementById("myButton4").disabled = false;
+					document.getElementById("myButton5").disabled = false;
+					document.getElementById("myButton6").disabled = false;
+					document.getElementById("myButton7").disabled = false;
+				}
+			};
+
+			document.getElementById("myButton9").onclick = function() {  
+				// save the list to file
+				var textDoc = document.createElement('a');
+				textDoc.href = 'data:attachment/text,' + encodeURI(ani_list.join('\n'));
+				textDoc.target = '_blank';
+				textDoc.download = bvhNameForSave + '.txt';
+				textDoc.click();
+			};
+
+			
+			document.getElementById("myButtonPrev").onclick = function() {  
+				file_current = (file_current - 1) % file_list.length;
+				if(file_current < 0) {
+					file_current = file_list.length - 1;
+				}
+				loadNewFile();
+			};
+
+			document.getElementById("myButtonNext").onclick = function() {  
+				file_current = (file_current + 1) % file_list.length;
+				loadNewFile();
+			};
+
+			function loadNewFile() {
+				gap_count = 0;
+				ani_list = [];
+				document.getElementById("myDiv").innerHTML = '';
+				document.getElementById("myRange").style.background = "gray";
+				loadBVH(file_list[file_current]);
+			}
+
+			function keyDownTextField(e) {
+			var keyCode = e.keyCode;
+			if(keyCode==32) { // space
+				document.getElementById("myButton4").click();
+			}
+			if(keyCode==81) { // q
+				document.getElementById("myButton1").click();
+			}
+			if(keyCode==87) { // w
+				document.getElementById("myButton3").click();
+			}
+			if(keyCode==69) { // e
+				document.getElementById("myButton2").click();
+			}
+			if(keyCode==82) { // r
+				document.getElementById("myButton8").click();
+			}
+			if(keyCode==65) { // a
+				document.getElementById("myButton5").click();
+			}
+			if(keyCode==68) { // d
+				document.getElementById("myButton6").click();
+			}
+
+			if(keyCode==77) {
+				mode = (mode + 1) % 2;
+			}
+			  if(keyCode==13) {
+				ani_curr = (ani_curr + 1) % 2;
+				mixer.setTime(ani_list[ani_curr][0]);
+			  //alert("You hit the enter key.");
+			  } else {
+			  //alert("Oh no you didn't.");
+			  }
+			}
+
+			function colorSlider() {
+				ani_list.sort(sortFunction);
+
+				var back_str =  "linear-gradient(to right,";
+				var last_end = 0;
+				var color_hue = 0;
+
+				for (var i = 0; i < ani_list.length; i++)
+				{
+					var st = parseFloat(ani_list[i][0]);
+					var en = parseFloat(ani_list[i][1]);
+
+					var mark_start = (st/ani_max)*100;
+					var mark_end = (en/ani_max)*100;
+			
+					color_hue = (hsv_increment * i) % 360;
+
+					// mark on slider
+					back_str += "gray " + last_end + "% " + mark_start + "%,"
+					back_str += 'hsl('+color_hue+',100%,50%)'+ " " + mark_start + "% " + mark_end + "%,"
+
+					last_end = mark_end;
+				}
+
+				back_str += "gray " + last_end + "% 100%)";
+				document.getElementById("myRange").style.background = back_str;
+			}
+
+			function sortFunction(a, b) {
+				if (a[0] === b[0]) {
+					return 0;
+				}
+				else {
+					return (a[0] < b[0]) ? -1 : 1;
+				}
+			}
+
+			function analyzeAnim() {
+				//console.log(current_animation_clip);
+				//console.log(mixer);
+				const material = new THREE.LineBasicMaterial( { color: 0x0000ff } );
+				const points = [];
+
+				for(var i = 0.0; i < 5.0; i+=0.1) {
+					mixer.update(0);
+					mixer.setTime(i);
+					mixer.update(0);
+					
+					const position = new THREE.Vector3();
+					points.push(mixer._root.bones[3].getWorldPosition( position ));
+					
+					//console.log(i + " " + mixer._root.bones[3].getWorldPosition( position ).x);
+				}
+				console.log(points);
+				const geometry = new THREE.BufferGeometry().setFromPoints( points );
+
+				const line = new THREE.Line( geometry, material );
+				scene.add( line );
+			}
+		</script>
+	</body>
+</html>
+
+
