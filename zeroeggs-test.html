@@ -58,8 +58,14 @@
 			<input type="text" id="myEnd" value="0" size="7" readonly="readonly">
 			<button type="button" id="myButton8" style="color:rgb(24, 0, 129);">Play/Pause Gap (R)</button>
 			<button type="button" id="myButton9" style="color:rgb(206, 20, 181);">Save File</button>
+			<p></p>
+			<input type="text" id="fileText" value="0" size="30" readonly="readonly">
 			<button type="button" id="myButtonPrev">Prev</button>
 			<button type="button" id="myButtonNext">Next</button>
+			Selected Gap: <input type="text" id="selectedgap" value="-1" size="3" readonly="readonly">
+			<button type="button" id="myRemoveSelectedGap">Remove Selected Gap</button>
+			<button type="button" id="seekLastEnd">Seek Last End</button>
+
 
 			<p></p><input type="range" min="0" max="50" value="0" class="slider" id="myRange" step="0.0001">
 		</div>
@@ -88,13 +94,142 @@
 
 			const clock = new THREE.Clock();
 
-			var file_current = 0;
+			var file_current = 42;
 			var file_list = [
 				"001_Neutral_0_mirror_x_1_0",
 				//"001_Neutral_0_x_1_0",
+				"002_Neutral_1_mirror_x_1_0",
+				//"002_Neutral_1_x_1_0",
 				"003_Neutral_2_mirror_x_1_0",
+				//"003_Neutral_2_x_1_0",
 				"004_Neutral_3_mirror_x_1_0",
-				"004_Neutral_3_mirror_x_1_0"
+				//"004_Neutral_3_x_1_0",
+				"005_Neutral_4_mirror_x_1_0",
+				//"005_Neutral_4_x_1_0",
+				"006_Sad_0_mirror_x_1_0",
+				//"006_Sad_0_x_1_0",
+				"007_Sad_1_mirror_x_1_0",
+				//"007_Sad_1_x_1_0",
+				"008_Sad_2_mirror_x_1_0",
+				//"008_Sad_2_x_1_0",
+				"009_Sad_3_mirror_x_1_0",
+				//"009_Sad_3_x_1_0",
+				"010_Sad_4_mirror_x_1_0",
+				//"010_Sad_4_x_1_0",
+				"011_Happy_0_mirror_x_1_0",
+				//"011_Happy_0_x_1_0",
+				"012_Happy_1_mirror_x_1_0",
+				// "012_Happy_1_x_1_0",
+				"013_Happy_2_mirror_x_1_0",
+				"013_Happy_2_x_1_0",
+				"014_Happy_3_mirror_x_1_0",
+				"014_Happy_3_x_1_0",
+				"015_Happy_4_mirror_x_1_0",
+				"015_Happy_4_x_1_0",
+				"016_Relaxed_0_mirror_x_1_0",
+				"016_Relaxed_0_x_1_0",
+				"017_Relaxed_1_mirror_x_1_0",
+				"017_Relaxed_1_x_1_0",
+				"018_Relaxed_2_mirror_x_1_0",
+				"018_Relaxed_2_x_1_0",
+				"019_Relaxed_3_mirror_x_1_0",
+				"019_Relaxed_3_x_1_0",
+				"020_Relaxed_4_mirror_x_1_0",
+				"020_Relaxed_4_x_1_0",
+				"021_Old_0_mirror_x_1_0",
+				"021_Old_0_x_1_0",
+				"022_Old_1_mirror_x_1_0",
+				"022_Old_1_x_1_0",
+				"023_Old_2_mirror_x_1_0",
+				"023_Old_2_x_1_0",
+				"024_Old_3_mirror_x_1_0",
+				"024_Old_3_x_1_0",
+				"025_Old_4_mirror_x_1_0",
+				"025_Old_4_x_1_0",
+				"026_Angry_0_mirror_x_1_0",
+				"026_Angry_0_x_1_0",
+				"027_Angry_1_mirror_x_1_0",
+				"027_Angry_1_x_1_0",
+				"028_Angry_2_mirror_x_1_0",
+				"028_Angry_2_x_1_0",
+				"029_Angry_3_mirror_x_1_0",
+				"029_Angry_3_x_1_0",
+				"030_Agreement_0_mirror_x_1_0",
+				"030_Agreement_0_x_1_0",
+				"031_Disagreement_0_mirror_x_1_0",
+				"031_Disagreement_0_x_1_0",
+				"032_Agreement_1_mirror_x_1_0",
+				"032_Agreement_1_x_1_0",
+				"033_Agreement_2_mirror_x_1_0",
+				"033_Agreement_2_x_1_0",
+				"034_Disagreement_1_mirror_x_1_0",
+				"034_Disagreement_1_x_1_0",
+				"035_Disagreement_2_mirror_x_1_0",
+				"035_Disagreement_2_x_1_0",
+				"036_Flirty_0_mirror_x_1_0",
+				"036_Flirty_0_x_1_0",
+				"037_Flirty_1_mirror_x_1_0",
+				"037_Flirty_1_x_1_0",
+				"038_Flirty_2_mirror_x_1_0",
+				"038_Flirty_2_x_1_0",
+				"039_Pensive_0_mirror_x_1_0",
+				"039_Pensive_0_x_1_0",
+				"040_Pensive_1_mirror_x_1_0",
+				"040_Pensive_1_x_1_0",
+				"041_Pensive_2_mirror_x_1_0",
+				"041_Pensive_2_x_1_0",
+				"042_Scared_0_mirror_x_1_0",
+				"042_Scared_0_x_1_0",
+				"043_Scared_1_mirror_x_1_0",
+				"043_Scared_1_x_1_0",
+				"044_Scared_2_mirror_x_1_0",
+				"044_Scared_2_x_1_0",
+				"045_Distracted_0_mirror_x_1_0",
+				"045_Distracted_0_x_1_0",
+				"046_Distracted_1_mirror_x_1_0",
+				"046_Distracted_1_x_1_0",
+				"047_Distracted_2_mirror_x_1_0",
+				"047_Distracted_2_x_1_0",
+				"048_Sarcastic_0_mirror_x_1_0",
+				"048_Sarcastic_0_x_1_0",
+				"049_Sarcastic_1_mirror_x_1_0",
+				"049_Sarcastic_1_x_1_0",
+				"050_Sarcastic_2_mirror_x_1_0",
+				"050_Sarcastic_2_x_1_0",
+				"051_Threatening_0_mirror_x_1_0",
+				"051_Threatening_0_x_1_0",
+				"052_Threatening_1_mirror_x_1_0",
+				"052_Threatening_1_x_1_0",
+				"053_Threatening_2_mirror_x_1_0",
+				"053_Threatening_2_x_1_0",
+				"054_Still_0_mirror_x_1_0",
+				"054_Still_0_x_1_0",
+				"055_Still_1_mirror_x_1_0",
+				"055_Still_1_x_1_0",
+				"056_Still_2_mirror_x_1_0",
+				"056_Still_2_x_1_0",
+				"057_Laughing_0_mirror_x_1_0",
+				"057_Laughing_0_x_1_0",
+				"058_Laughing_1_mirror_x_1_0",
+				"058_Laughing_1_x_1_0",
+				"059_Sneaky_0_mirror_x_1_0",
+				"059_Sneaky_0_x_1_0",
+				"060_Sneaky_1_mirror_x_1_0",
+				"060_Sneaky_1_x_1_0",
+				"061_Sneaky_2_mirror_x_1_0",
+				"061_Sneaky_2_x_1_0",
+				"062_Tired_0_mirror_x_1_0",
+				"062_Tired_0_x_1_0",
+				"063_Tired_1_mirror_x_1_0",
+				"063_Tired_1_x_1_0",
+				"064_Tired_2_mirror_x_1_0",
+				"064_Tired_2_x_1_0",
+				"065_Speech_0_mirror_x_1_0",
+				"065_Speech_0_x_1_0",
+				"066_Speech_1_mirror_x_1_0",
+				"066_Speech_1_x_1_0",
+				"067_Speech_2_mirror_x_1_0",
+				"067_Speech_2_x_1_0"
 			];
 
 			let camera, controls, scene, renderer;
@@ -106,7 +241,6 @@
 			var current_animation_clip;
 
 			var ani_list = [];
-			var ani_curr = 0;
 			var mode = 1;
 
 			var ani_start = 0;
@@ -173,6 +307,7 @@
 
 									last_end = mark_end;
 
+									// select button funtionality
 									btn.onclick = function() {
 										var index = parseInt(this.innerHTML);
 										ani_start = ani_list[index][0];
@@ -192,6 +327,8 @@
 										document.getElementById("myButton5").disabled = true;
 										document.getElementById("myButton6").disabled = true;
 										document.getElementById("myButton7").disabled = true;
+
+										document.getElementById("selectedgap").value = index;
 									}
 
 									btn.style.backgroundColor = 'hsl('+color_hue+',30%,50%)';
@@ -212,7 +349,7 @@
 
 			const loader = new BVHLoader();
 
-			loadBVH(file_list[2]);
+			loadBVH(file_list[file_current]);
 
 			function loadBVH(bvhName) {
 				
@@ -222,6 +359,8 @@
 					scene.remove(obj2); 
 
 				bvhNameForSave = bvhName;
+				document.getElementById("fileText").value = bvhName;
+
 				loader.load("animations/" + bvhName + ".bvh", function ( result ) {
 					skeletonHelper = new THREE.SkeletonHelper( result.skeleton.bones[ 0 ] );
 					skeletonHelper.skeleton = result.skeleton; // allow animation mixer to bind to THREE.SkeletonHelper directly
@@ -229,9 +368,10 @@
 					const boneContainer = new THREE.Group();
 
 					// to get the skeleton to the center
-					boneContainer.position.set(340,-100,550);
+					//boneContainer.position.set(340,-100,550);
 
 					boneContainer.add( result.skeleton.bones[ 0 ] );
+
 					
 					obj1 = skeletonHelper;
 					obj2 = boneContainer;
@@ -245,10 +385,12 @@
 					mixer = new THREE.AnimationMixer( skeletonHelper );
 					mixer.clipAction( result.clip ).setEffectiveWeight( 1.0 ).play();
 
-					analyzeAnim();
+					// analyzeAnim();
 
 					ani_max = mixer._actions[0]._clip.duration;
 					document.getElementById("myRange").max = ani_max;
+
+					boneContainer.position.sub(findDisplacementToCenter(mixer));
 
 					//console.log(mixer._actions[0]._clip.duration);
 
@@ -352,7 +494,8 @@
 				// add current gap to the list
 				let btn = document.createElement("button");
 				btn.innerHTML = gap_count;
-				
+				btn.id = "gapbutton" + gap_count;
+
 				btn.onclick = function() {
 					var index = parseInt(this.innerHTML);
 					ani_start = ani_list[index][0];
@@ -372,6 +515,8 @@
 					document.getElementById("myButton5").disabled = true;
 					document.getElementById("myButton6").disabled = true;
 					document.getElementById("myButton7").disabled = true;
+
+					document.getElementById("selectedgap").value = index;
 				}
 
 				var hue = (hsv_increment * gap_count) % 360;
@@ -384,6 +529,7 @@
 				gap_count += 1;
 
 				colorSlider();
+				seekLastEnd();
 			};
 
 			document.getElementById("myButton4").onclick = function() {  
@@ -392,12 +538,12 @@
 			};
 
 			document.getElementById("myButton5").onclick = function() {  
-				ani_time -= 0.01;
+				ani_time -= 0.05;
 				document.getElementById("myRange").value = ani_time;
 			};
 
 			document.getElementById("myButton6").onclick = function() {  
-				ani_time += 0.01;
+				ani_time += 0.05;
 				document.getElementById("myRange").value = ani_time;
 			};
 
@@ -441,16 +587,24 @@
 
 			
 			document.getElementById("myButtonPrev").onclick = function() {  
-				file_current = (file_current - 1) % file_list.length;
+				file_current = (file_current - 2) % file_list.length;
 				if(file_current < 0) {
-					file_current = file_list.length - 1;
+					file_current = file_list.length - 2;
 				}
 				loadNewFile();
 			};
 
 			document.getElementById("myButtonNext").onclick = function() {  
-				file_current = (file_current + 1) % file_list.length;
+				file_current = (file_current + 2) % file_list.length;
 				loadNewFile();
+			};
+
+			document.getElementById("myRemoveSelectedGap").onclick = function() {  
+				removeSelectedGap();
+			};
+
+			document.getElementById("seekLastEnd").onclick = function() {  
+				seekLastEnd();
 			};
 
 			function loadNewFile() {
@@ -459,7 +613,17 @@
 				document.getElementById("myDiv").innerHTML = '';
 				document.getElementById("myRange").style.background = "gray";
 				loadBVH(file_list[file_current]);
+				document.getElementById("selectedgap").value = -1;
 			}
+
+			function seekLastEnd() {
+				if(gap_count > 0){
+					ani_time = ani_list[gap_count-1][1];
+					document.getElementById("myStart").value = ani_time;
+					document.getElementById("myRange").value = ani_time;
+					ani_start = ani_time;
+				}
+ 			}
 
 			function keyDownTextField(e) {
 			var keyCode = e.keyCode;
@@ -485,16 +649,13 @@
 				document.getElementById("myButton6").click();
 			}
 
+			if(keyCode==78) { // n
+				nextRandom();
+			}
+
 			if(keyCode==77) {
 				mode = (mode + 1) % 2;
 			}
-			  if(keyCode==13) {
-				ani_curr = (ani_curr + 1) % 2;
-				mixer.setTime(ani_list[ani_curr][0]);
-			  //alert("You hit the enter key.");
-			  } else {
-			  //alert("Oh no you didn't.");
-			  }
 			}
 
 			function colorSlider() {
@@ -534,9 +695,36 @@
 				}
 			}
 
+			function findDisplacementToCenter(mixer) {
+				mixer.update(0);
+				mixer.setTime(0);
+				mixer.update(0);
+				
+				const position = new THREE.Vector3();
+				const r = mixer._root.bones[79].getWorldPosition( position );
+				const l = mixer._root.bones[89].getWorldPosition( position );
+				const m = new THREE.Vector3( 0, 0, 0 );
+				m.add(r,l);
+				m.divideScalar(2);
+				return m;				
+			}
+
+			function removeSelectedGap() {
+				const index = parseInt(document.getElementById("selectedgap").value);
+				if(gap_count > 0 && index >= 0) {
+					document.getElementById("gapbutton" + (gap_count-1)).remove();
+					ani_list.splice(index,1);
+					gap_count--;
+					colorSlider();
+					document.getElementById("selectedgap").value = -1;
+				}
+			}
+
 			function analyzeAnim() {
 				//console.log(current_animation_clip);
-				//console.log(mixer);
+				//console.log(mixer._root.bones);
+				console.log(mixer._root);
+
 				const material = new THREE.LineBasicMaterial( { color: 0x0000ff } );
 				const points = [];
 
@@ -550,11 +738,113 @@
 					
 					//console.log(i + " " + mixer._root.bones[3].getWorldPosition( position ).x);
 				}
-				console.log(points);
+				// console.log(points);
 				const geometry = new THREE.BufferGeometry().setFromPoints( points );
 
 				const line = new THREE.Line( geometry, material );
 				scene.add( line );
+			}
+
+			function loadAll() {
+				loadMultiBVH();
+			}
+
+			var random_index = -1;
+			var random_index2 = -1;
+
+			function nextRandom() {
+
+				if(random_index >= 0) {
+					obj1.visible = false;
+					obj1.visible = false;
+
+					multiAnim_bone[random_index].visible = false;
+					multiAnim_helper[random_index].visible = false;
+				}
+
+				random_index = Math.floor(Math.random() * 5);
+
+				multiAnim_bone[random_index].visible = true;
+				multiAnim_helper[random_index].visible = true;
+				mixer = multiAnim_mixer[random_index];
+				console.log(multiAnim_times);
+				random_index2 = multiAnim_times[random_index].length;
+
+				random_index2 = Math.floor(Math.random() * random_index2);
+				console.log(random_index2);
+
+				ani_start = multiAnim_times[random_index][random_index2][0];
+				ani_end = multiAnim_times[random_index][random_index2][1];
+				mode = 0;
+			}
+
+			var multiAnim_bone = [];
+			var multiAnim_helper = [];
+			var multiAnim_mixer = [];
+			var multiAnim_times = [];
+
+			loadAll();
+
+			function loadMultiBVH() {
+				for(var file_index_counter = 0; file_index_counter < 5; file_index_counter++) { // file_list.length
+					loader.load("animations/" + file_list[file_index_counter] + ".bvh", function ( result ) {
+						skeletonHelper = new THREE.SkeletonHelper( result.skeleton.bones[ 0 ] );
+						skeletonHelper.skeleton = result.skeleton;
+						const boneContainer = new THREE.Group();
+						boneContainer.add( result.skeleton.bones[ 0 ] );
+
+						skeletonHelper.visible = false;
+						boneContainer.visible = false;
+
+						multiAnim_helper.push(skeletonHelper);
+						multiAnim_bone.push(boneContainer);
+						
+						scene.add( skeletonHelper );
+						scene.add( boneContainer );
+
+						current_animation_clip = result.clip;
+
+						mixer = new THREE.AnimationMixer( skeletonHelper );
+						mixer.clipAction( result.clip ).setEffectiveWeight( 1.0 ).play();
+
+						ani_max = mixer._actions[0]._clip.duration;
+						document.getElementById("myRange").max = ani_max;
+
+						boneContainer.position.sub(findDisplacementToCenter(mixer));
+
+						multiAnim_mixer.push(mixer);
+					});
+
+					const client = new XMLHttpRequest();
+						client.open('GET', "animations/" + file_list[file_index_counter] + ".txt");	
+						console.log("animations/" + file_list[file_index_counter] + ".txt");				
+						client.onreadystatechange = function() {
+							if(this.readyState == 4) {
+								if(this.status == 404) {
+									console.log("No segments file found for this animation.");
+								}
+								else
+								{
+									console.log(client.responseText);
+									var rsp = client.responseText;
+									var arr = rsp.split("\n");
+									const list = [];
+									for (var i = 0; i < arr.length; i++)
+									{
+										var arr2 = arr[i].split(",");
+										if(arr2.length == 2) 
+										{
+											var st = parseFloat(arr2[0]);
+											var en = parseFloat(arr2[1]);
+											list.push([st,en]);
+										}
+									}
+									multiAnim_times.push(list);
+								}
+							}
+						}
+						client.send();
+				}
 			}
 		</script>
 	</body>
